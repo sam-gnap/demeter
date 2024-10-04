@@ -65,7 +65,11 @@ class UnitDecimal(Decimal):
         :return: formatted string
         :rtype: str
         """
-        dec = self.quantize(DECIMAL_1) if (self == self.to_integral() and self < 1e29) else self.normalize()
+        dec = (
+            self.quantize(DECIMAL_1)
+            if (self == self.to_integral() and self < 1e29)
+            else self.normalize()
+        )
         return "{:{}} {}".format(dec, Formats.global_num_format, self._unit)
 
     @property
@@ -125,9 +129,33 @@ class DemeterWarning(RuntimeWarning):
         self.message = message
 
 
+from enum import Enum
+
+
 class ChainType(str, Enum):
     """
-    Enum for chains
+    Enum representing different blockchain networks.
+
+    This enum provides a standardized way to refer to various blockchain networks.
+    Each enum member is a string representing the lowercase name of the network.
+
+    Usage:
+        - Access a specific chain: ChainType.polygon
+        - Get the string value: str(ChainType.polygon) or ChainType.polygon.value
+        - Compare with strings: ChainType.ethereum == "ethereum"
+        - List all available chains: ChainType.list()
+
+    Attributes:
+        ethereum (str): Ethereum mainnet
+        polygon (str): Polygon (formerly Matic) network
+        optimism (str): Optimism L2 network
+        arbitrum (str): Arbitrum L2 network
+        celo (str): Celo network
+        bsc (str): Binance Smart Chain
+        base (str): Base network
+        avalanche (str): Avalanche network
+        fantom (str): Fantom network
+        harmony (str): Harmony network
     """
 
     ethereum = "ethereum"
@@ -141,6 +169,13 @@ class ChainType(str, Enum):
     fantom = "fantom"
     harmony = "harmony"
 
+    @classmethod
+    def list(cls):
+        return list(cls)
+
+    def __str__(self):
+        return self.value
+
 
 @dataclass
 class MarketDescription:
@@ -148,6 +183,7 @@ class MarketDescription:
     """market type string"""
     name: str
     """market name"""
+
 
 @dataclass
 class DemeterLog:
@@ -179,5 +215,4 @@ STABLE_COINS = [
     "USDX",
     "LUSD",
     "GHO",
-
 ]
