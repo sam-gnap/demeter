@@ -49,7 +49,9 @@ def performance_metrics(
         MetricEnum.return_rate: return_rate(init, final),
         MetricEnum.annualized_return: annualized_return(duration_in_day, init, final),
         MetricEnum.max_draw_down: max_draw_down(values),
-        MetricEnum.sharpe_ratio: sharpe_ratio(interval_in_day, duration_in_day, values, annualized_risk_free_rate),
+        MetricEnum.sharpe_ratio: sharpe_ratio(
+            interval_in_day, duration_in_day, values, annualized_risk_free_rate
+        ),
         MetricEnum.volatility: volatility(returns, interval_in_day),
         MetricEnum.alpha: alpha,
         MetricEnum.beta: beta,
@@ -59,5 +61,17 @@ def performance_metrics(
     return {k: v for k, v in metric_map.items()}
 
 
-def round_results(val_dict: Dict[MetricEnum, Any], decimal: int = 3):
-    return {k: round(v, decimal) if isinstance(v, (int, float, complex, Decimal)) else v for k, v in val_dict.items()}
+def round_results(val_dict: Dict[MetricEnum, Any], decimal: int = 5):
+    def round_value(v):
+        if isinstance(v, (int, float, complex, Decimal)):
+            return round(v, decimal)
+        elif isinstance(v, pd.Timestamp):
+            return v
+        elif isinstance(v, str):
+            return v
+        elif v is None:
+            return None
+        else:
+            return v
+
+    return {k: round_value(v) for k, v in val_dict.items()}

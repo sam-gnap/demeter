@@ -30,6 +30,7 @@ class PositionInfo(NamedTuple):
     def __str__(self):
         return f"""tick:{self.lower_tick},{self.upper_tick}"""
 
+
 @dataclass
 class UniDescription(MarketDescription):
     """
@@ -48,36 +49,129 @@ class UniDescription(MarketDescription):
     """fee rate"""
 
 
-class UniV3Pool(object):
-    """
-    pool information, corresponding with definition in pool contract.
+# class UniV3Pool(object):
+#     """
+#     pool information, corresponding with definition in pool contract.
 
-    :param token0: First token in  pool contract.
-    :type token0:  TokenInfo
-    :param token1: Second token in  pool contract.
-    :type token1: TokenInfo
-    :param fee: fee rate of this pool, should be among [0.05%, 0.3%, 1%]
-    :type fee: float, 0.05
-    :param quote_token: which token will be considered as base token. e.g. to a token pair of USDT/BTC, if you want price unit to be like 10000 usdt/btc, you should set usdt as base token, otherwise if price unit is 0.00001 btc/usdt, you should set btc as base token
-    :type quote_token: TokenInfo
-    """
+#     :param token0: First token in  pool contract.
+#     :type token0:  TokenInfo
+#     :param token1: Second token in  pool contract.
+#     :type token1: TokenInfo
+#     :param fee: fee rate of this pool, should be among [0.05%, 0.3%, 1%]
+#     :type fee: float, 0.05
+#     :param quote_token: which token will be considered as base token. e.g. to a token pair of USDT/BTC, if you want price unit to be like 10000 usdt/btc, you should set usdt as base token, otherwise if price unit is 0.00001 btc/usdt, you should set btc as base token
+#     :type quote_token: TokenInfo
+#     """
 
-    def __init__(self, token0: TokenInfo, token1: TokenInfo, fee: float, quote_token: TokenInfo):
-        fee = Decimal(str(fee))
-        self.token0 = token0
-        self.token1 = token1
-        self.is_token0_quote = quote_token == token0
-        self.quote_token = quote_token
-        self.tick_spacing = int(fee * 200)
-        self.fee: Decimal = fee * Decimal(10000)
-        self.fee_rate: Decimal = Decimal(fee) / Decimal(100)
+#     def __init__(self, token0: TokenInfo, token1: TokenInfo, fee: float, quote_token: TokenInfo):
+#         fee = Decimal(str(fee))
+#         self.token0 = token0
+#         self.token1 = token1
+#         self.is_token0_quote = quote_token == token0
+#         self.quote_token = quote_token
+#         self.tick_spacing = int(fee * 200)
+#         self.fee: Decimal = fee * Decimal(10000)
+#         self.fee_rate: Decimal = Decimal(fee) / Decimal(100)
+
+#     def __str__(self):
+#         return (
+#             "PoolBaseInfo(Token0: {},".format(self.token0)
+#             + "Token1: {},".format(self.token1)
+#             + "fee: {}%,".format(self.fee_rate * Decimal(100))
+#             + "base token: {})".format(
+#                 self.token0.name if self.is_token0_quote else self.token1.name
+#             )
+#         )
+
+#     def __repr__(self):
+#         return self.__str__()
+
+
+import requests
+
+
+class UniV3Pool:
+    POOL_QUERY = """query get_pools($pool_id: ID!) {
+        pools(where: {id: $pool_id}) {
+            tick
+            sqrtPrice
+            liquidity
+            feeTier
+            totalValueLockedUSD
+            totalValueLockedETH
+            token0 {
+                symbol
+                decimals
+            }
+            token1 {
+                symbol
+                decimals
+            }
+        }
+    }"""
+
+    STABLECOINS = ["USDC", "DAI", "USDT", "TUSD", "LUSD", "BUSD", "GUSD", "UST"]
+
+    def __init__(self, pool_address: str, api_key: str):
+        self.pool_address = pool_address
+        self.api_key = api_key
+        self.load_pool_data()
+        self.detect_quote_token()
+
+    def load_pool_data(self):
+        data = self.fetch_data_subgraph(self.POOL_QUERY, {"pool_id": self.pool_address}, "pools")[0]
+        self.token0 = TokenInfo(
+            name=str(data["token0"]["symbol"]), decimal=int(data["token0"]["decimals"])
+        )
+        self.token1 = TokenInfo(
+            name=str(data["token1"]["symbol"]), decimal=int(data["token1"]["decimals"])
+        )
+        self.token0_str = str(self.token0.name)
+        self.token1_str = str(self.token1.name)
+        self.fee_tier_bps = int(data["feeTier"])
+        self.fee = Decimal(self.fee_tier_bps) / Decimal(10000)
+        self.fee_rate = self.fee / Decimal(100)
+        self.tick_spacing = self.fee_tier_to_tick_spacing()
+        self.sqrt_price_x96 = int(data["sqrtPrice"])
+        self.liquidity = int(data["liquidity"])
+        self.tick = int(data["tick"])
+        self.total_value_locked_usd = float(data["totalValueLockedUSD"])
+        self.total_value_locked_eth = float(data["totalValueLockedETH"])
+
+    def detect_quote_token(self):
+        if self.token0_str in self.STABLECOINS:
+            self.quote_token = self.token0
+            self.quote_token_str = self.token0_str
+            self.is_token0_quote = True
+        elif self.token1_str in self.STABLECOINS:
+            self.quote_token = self.token1
+            self.quote_token_str = self.token1_str
+            self.is_token0_quote = False
+        else:
+            # If neither token is a stablecoin, default to token0 as quote
+            self.quote_token = self.token0
+            self.quote_token_str = self.token0_str
+            self.is_token0_quote = True
+
+    def fee_tier_to_tick_spacing(self):
+        return {100: 1, 500: 10, 3000: 60, 10000: 200}.get(self.fee_tier_bps, 60)
+
+    def fetch_data_subgraph(self, query, variables=None, data_key=None):
+        url = f"https://gateway-arbitrum.network.thegraph.com/api/{self.api_key}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV"
+        response = requests.post(url, json={"query": query, "variables": variables})
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"Query failed. Status code: {response.status_code}. Response: {response.text}"
+            )
+        result = response.json()
+        return result["data"][data_key] if data_key else result["data"]
 
     def __str__(self):
         return (
-            "PoolBaseInfo(Token0: {},".format(self.token0)
-            + "Token1: {},".format(self.token1)
-            + "fee: {}%,".format(self.fee_rate * Decimal(100))
-            + "base token: {})".format(self.token0.name if self.is_token0_quote else self.token1.name)
+            f"PoolBaseInfo(Token0: {self.token0}, "
+            f"Token1: {self.token1}, "
+            f"fee: {self.fee_rate * Decimal(100)}%, "
+            f"base token: {self.token0.name if self.is_token0_quote else self.token1.name})"
         )
 
     def __repr__(self):
@@ -214,7 +308,9 @@ class Position(object):
     liquidity: int
     lower_price: Decimal
     upper_price: Decimal
-    transferred: bool = False  # this position(nft) has been transferred, so owner is not current user.
+    transferred: bool = (
+        False  # this position(nft) has been transferred, so owner is not current user.
+    )
 
 
 def position_dict_to_dataframe(positions: Dict[PositionInfo, Position]) -> pd.DataFrame:
