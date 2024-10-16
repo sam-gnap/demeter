@@ -127,7 +127,7 @@ class TimeRangeTrigger(Trigger):
 
     :param time_range: when current timestamp is between time range, will trigger action, end time will not be included
     :type time_range: TimeRange
-    :param do: which action to take.
+    :param do: which action to take.å
     :type do: Callable[[RowData], Any]
     """
 
@@ -155,7 +155,9 @@ class TimeRangesTrigger(Trigger):
     """
 
     def __init__(self, time_range: List[TimeRange], do, **kwargs):
-        self._time_range: [TimeRange] = [TimeRange(to_minute(t.start), to_minute(t.end)) for t in time_range]
+        self._time_range: [TimeRange] = [
+            TimeRange(to_minute(t.start), to_minute(t.end)) for t in time_range
+        ]
         super().__init__(do, **kwargs)
 
     def when(self, row_data: RowData) -> bool:
@@ -189,7 +191,14 @@ class PeriodTrigger(Trigger):
     :type pending: timedelta
     """
 
-    def __init__(self, time_delta: timedelta, do, trigger_immediately=False, pending=timedelta(minutes=0), **kwargs):
+    def __init__(
+        self,
+        time_delta: timedelta,
+        do,
+        trigger_immediately=False,
+        pending=timedelta(minutes=0),
+        **kwargs
+    ):
         self._next_match = None
         self._delta = time_delta
         self._trigger_immediately = trigger_immediately
@@ -229,7 +238,12 @@ class PeriodsTrigger(Trigger):
     """
 
     def __init__(
-        self, time_delta: List[timedelta], do, trigger_immediately=False, pending=timedelta(minutes=0), **kwargs
+        self,
+        time_delta: List[timedelta],
+        do,
+        trigger_immediately=False,
+        pending=timedelta(minutes=0),
+        **kwargs
     ):
         self._next_matches = [None for _ in time_delta]
         self._deltas = time_delta

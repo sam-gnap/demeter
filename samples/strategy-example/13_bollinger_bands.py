@@ -21,6 +21,8 @@ pd.options.display.width = 5000
 
 c = 2
 
+from demeter import PriceTrigger
+
 
 class AddByVolatility(Strategy):
     """
@@ -39,13 +41,21 @@ class AddByVolatility(Strategy):
     """
 
     def initialize(self):
-        self.add_column(market_key, "sma_1_day", simple_moving_average(self.data[market_key].price, timedelta(days=1)))
+        self.add_column(
+            market_key,
+            "sma_1_day",
+            simple_moving_average(self.data[market_key].price, timedelta(days=1)),
+        )
         self.add_column(
             market_key,
             "volatility",
             realized_volatility(self.data[market_key].price, timedelta(days=1), timedelta(days=1)),
         )
-        self.triggers.append(PeriodTrigger(time_delta=timedelta(hours=4), trigger_immediately=True, do=self.work))
+
+        self.triggers.append(
+            PeriodTrigger(time_delta=timedelta(hours=4), trigger_immediately=True, do=self.work)
+        )
+
         self.markets.default.even_rebalance(self.data[market_key].iloc[0]["price"])
 
     def work(self, row_data: RowData):
@@ -77,9 +87,12 @@ if __name__ == "__main__":
     broker.set_balance(eth, 0)
 
     actuator.strategy = AddByVolatility()
-    market.data_path = "../data"
+    market.data_path = "/Users/gnapsamuel/Documents/AMM/demeter-fetch/sample-data"
     market.load_data(
-        ChainType.polygon.name, "0x45dda9cb7c25131df268515131f647d726f50608", date(2023, 8, 13), date(2023, 8, 17)
+        ChainType.ethereum.name,
+        "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+        date(2024, 8, 15),
+        date(2024, 9, 1),
     )
     actuator.set_price(market.get_price_from_data())
     actuator.run()  # run test

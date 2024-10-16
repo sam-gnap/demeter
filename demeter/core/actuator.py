@@ -237,7 +237,9 @@ class Actuator(object):
             self._broker.set_balance(asset.token_info, asset.balance)
 
     def set_price(
-        self, prices: Union[pd.DataFrame, pd.Series, Tuple[pd.DataFrame, TokenInfo]], quote_token: TokenInfo = None
+        self,
+        prices: Union[pd.DataFrame, pd.Series, Tuple[pd.DataFrame, TokenInfo]],
+        quote_token: TokenInfo = None,
     ):
         """
         | Set price to actuator. param price can be dataframe(price of several tokens) or series(price of one token).
@@ -318,8 +320,10 @@ class Actuator(object):
 
         default_market_data = self.broker.markets.default.data
         if (
-            self._token_prices.index[0] > default_market_data.head(1).index.get_level_values(0).unique()[0]
-            or self._token_prices.index[-1] < default_market_data.tail(1).index.get_level_values(0).unique()[0]
+            self._token_prices.index[0]
+            > default_market_data.head(1).index.get_level_values(0).unique()[0]
+            or self._token_prices.index[-1]
+            < default_market_data.tail(1).index.get_level_values(0).unique()[0]
         ):
             raise DemeterError("Time range of price doesn't cover market data")
 
@@ -351,13 +355,21 @@ class Actuator(object):
         for market_key in self.broker.markets.keys():
             if (not update) or (update and self._broker.markets[market_key].has_update):
                 ms = MarketStatus(timestamp, None)
-                self._broker.markets[market_key].set_market_status(ms, self._token_prices.loc[timestamp])
+                self._broker.markets[market_key].set_market_status(
+                    ms, self._token_prices.loc[timestamp]
+                )
 
     def get_test_range(self):
-        longest_data = max(map(lambda m: len(m.data.index.get_level_values(0).unique()), self._broker.markets.values()))
+        longest_data = max(
+            map(
+                lambda m: len(m.data.index.get_level_values(0).unique()),
+                self._broker.markets.values(),
+            )
+        )
         largest_market = list(
             filter(
-                lambda m: len(m.data.index.get_level_values(0).unique()) == longest_data, self._broker.markets.values()
+                lambda m: len(m.data.index.get_level_values(0).unique()) == longest_data,
+                self._broker.markets.values(),
             )
         )[0]
         # start = largest_market.data.head(1).index.get_level_values(0).unique()
@@ -401,7 +413,7 @@ class Actuator(object):
         if self.interval != "1min":
             self.logger.info(f"Interval is {self.interval}, resampling data...")
             index_array = self.switch_interval(index_array)
-        self.logger.info(f"Qute token is {self.broker.quote_token}")
+        self.logger.info(f"Quote token is {self.broker.quote_token}")  # what does Qute mean
         self.logger.info("init strategy...")
 
         # set initial status for strategy, so user can run some calculation in initial function.
@@ -413,6 +425,7 @@ class Actuator(object):
         )
         self.init_strategy()
         row_id = 0
+        rebalanced_rows = []
         data_length = len(index_array)
         self.logger.info("start main loop...")
         with tqdm(total=data_length, ncols=150) as pbar:
@@ -431,7 +444,9 @@ class Actuator(object):
                                 trigger.do(row_data)
                     # remove outdate triggers
                     self._strategy.triggers = [
-                        x for x in self._strategy.triggers if not x.is_out_date(self._currents.timestamp)
+                        x
+                        for x in self._strategy.triggers
+                        if not x.is_out_date(self._currents.timestamp)
                     ]
                     for market in self.broker.markets.values():
                         if market.is_open and market.open is not None:
@@ -453,7 +468,9 @@ class Actuator(object):
                     self._strategy.after_bar(row_data)
 
                     self._account_status_list.append(
-                        self._broker.get_account_status(current_price, timestamp_index.to_pydatetime())
+                        self._broker.get_account_status(
+                            current_price, timestamp_index.to_pydatetime()
+                        )
                     )
                     # notify actions in current loop
                     self.notify(self.strategy, self._currents.actions)
@@ -479,7 +496,9 @@ class Actuator(object):
         self.logger.info(f"Backtesting finished, execute time {time.time() - self.__start_time}s")
 
     def _generate_account_status_df(self):
-        self._account_status_df: pd.DataFrame = AccountStatus.to_dataframe(self._account_status_list)
+        self._account_status_df: pd.DataFrame = AccountStatus.to_dataframe(
+            self._account_status_list
+        )
 
         tmp_price_df = (
             self._token_prices.drop(columns=[USD.name])
@@ -507,7 +526,9 @@ class Actuator(object):
         print(get_formatted_predefined("Account balance history", STYLE["header1"]))
         console_text.print_dataframe_with_precision(self._account_status_df)
 
-    def save_result(self, path: str, file_name: str = None, decimals: int | None = None, **custom_attr) -> List[str]:
+    def save_result(
+        self, path: str, file_name: str = None, decimals: int | None = None, **custom_attr
+    ) -> List[str]:
         """
         Save backtesting result
 
@@ -522,7 +543,11 @@ class Actuator(object):
         """
         # if not self.__backtest_finished:
         #     raise DemeterError("Please run strategy first")
-        file_name_head = file_name if file_name is not None else "backtest-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        file_name_head = (
+            file_name
+            if file_name is not None
+            else "backtest-" + datetime.now().strftime("%Y%m%d-%H%M%S")
+        )
         if not os.path.exists(path):
             os.mkdir(path)
         file_list = []
